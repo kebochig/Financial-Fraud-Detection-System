@@ -1,0 +1,59 @@
+{
+  "report_metadata": {
+    "generated_at": "2025-08-03T02:04:03.414120",
+    "parser_version": "1.0.0",
+    "report_type": "Transaction Log Parsing Statistics"
+  },
+  "statistics": {
+    "parsing_summary": {
+      "total_logs_processed": 199,
+      "successfully_parsed": 155,
+      "parsing_failures": 44,
+      "empty_logs": 20,
+      "malformed_logs": 24,
+      "success_rate_percent": 77.89,
+      "failure_rate_percent": 22.11,
+      "empty_rate_percent": 10.05,
+      "malformed_rate_percent": 12.06
+    },
+    "quality_metrics": {
+      "parsing_efficiency": "Medium",
+      "data_quality": "Fair",
+      "usable_data_ratio": 77.89
+    },
+    "error_analysis": {
+      "total_errors": 88,
+      "error_categories": {
+        "parsing_errors": 44,
+        "empty_entries": 20,
+        "malformed_entries": 24
+      },
+      "common_errors": []
+    },
+    "format_analysis": {
+      "detected_formats": {
+        "colon_separated": "Format: timestamp::user::type::amount::location::device",
+        "pipe_with_usr": "Format: usr:user|type|amount|location|timestamp|device",
+        "arrow_format": "Format: timestamp >> [user] did action - amt=amount - location // dev:device",
+        "triple_colon": "Format: dd/mm/yyyy hh:mm:ss ::: user *** ACTION ::: amt:amount @ location <device>",
+        "dash_format": "Format: timestamp - user=user - action=type amount - ATM: location - device=device",
+        "space_separated": "Format: user timestamp type amount location device",
+        "pipe_standard": "Format: timestamp | user: user | txn: type of amount from location | device: device"
+      },
+      "format_complexity": "Multiple formats detected - parser handles 7+ different log structures",
+      "parsing_strategy": "Sequential format matching with regex fallback"
+    },
+    "recommendations": [
+      "High failure rate detected - investigate parsing logic",
+      "Consider implementing additional regex patterns"
+    ]
+  },
+  "raw_parsing_data": {
+    "total_logs": 199,
+    "parsed_successfully": 155,
+    "parsing_failed": 44,
+    "empty_logs": 20,
+    "malformed_logs": 24,
+    "parsing_errors": []
+  }
+}
