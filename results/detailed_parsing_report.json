@@ -1,32 +1,32 @@
 {
   "report_metadata": {
-    "generated_at": "2025-08-04T21:47:38.170429",
+    "generated_at": "2025-08-04T22:44:31.319197",
     "parser_version": "1.0.0",
     "report_type": "Transaction Log Parsing Statistics"
   },
   "statistics": {
     "parsing_summary": {
-      "total_logs_processed": 199,
-      "successfully_parsed": 155,
-      "parsing_failures": 44,
-      "empty_logs": 20,
-      "malformed_logs": 24,
-      "success_rate_percent": 77.89,
-      "failure_rate_percent": 22.11,
-      "empty_rate_percent": 10.05,
-      "malformed_rate_percent": 12.06
+      "total_logs_processed": 10000,
+      "successfully_parsed": 7774,
+      "parsing_failures": 0,
+      "empty_logs": 1124,
+      "malformed_logs": 1102,
+      "success_rate_percent": 77.74,
+      "failure_rate_percent": 0.0,
+      "empty_rate_percent": 11.24,
+      "malformed_rate_percent": 11.02
     },
     "quality_metrics": {
       "parsing_efficiency": "Medium",
       "data_quality": "Fair",
-      "usable_data_ratio": 77.89
+      "usable_data_ratio": 77.74
     },
     "error_analysis": {
-      "total_errors": 88,
+      "total_errors": 2226,
       "error_categories": {
-        "parsing_errors": 44,
-        "empty_entries": 20,
-        "malformed_entries": 24
+        "parsing_errors": 0,
+        "empty_entries": 1124,
+        "malformed_entries": 1102
       },
       "common_errors": []
     },
@@ -44,16 +44,20 @@
       "parsing_strategy": "Sequential format matching with regex fallback"
     },
     "recommendations": [
-      "High failure rate detected - investigate parsing logic",
-      "Consider implementing additional regex patterns"
+      "Parsing performance is within acceptable ranges",
+      "Monitor trends over time for any degradation"
     ]
   },
   "raw_parsing_data": {
-    "total_logs": 199,
-    "parsed_successfully": 155,
-    "parsing_failed": 44,
-    "empty_logs": 20,
-    "malformed_logs": 24,
-    "parsing_errors": []
+    "total_logs": 10000,
+    "parsed_successfully": 7774,
+    "parsing_failed": 0,
+    "empty_logs": 1124,
+    "malformed_logs": 1102,
+    "parsing_errors": [],
+    "parsing_success": {
+      "success": 7774,
+      "failed": 2226
+    }
   }
 }

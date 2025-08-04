@@ -1,0 +1,12 @@
+{
+  "total_logs": 10000,
+  "parsed_successfully": 7774,
+  "parsing_failed": 0,
+  "empty_logs": 1124,
+  "malformed_logs": 1102,
+  "parsing_errors": [],
+  "parsing_success": {
+    "success": 7774,
+    "failed": 2226
+  }
+}

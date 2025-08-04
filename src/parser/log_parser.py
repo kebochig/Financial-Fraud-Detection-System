@@ -218,11 +218,11 @@ class TransactionLogParser:
                     transaction.currency = amount_match.group(1) or None
                     transaction.amount = float(amount_match.group(2))
             
-            # Extract location
-            location_match = re.search(r'- ([^/]+) //', rest)
-            if location_match:
-                location = location_match.group(1).strip()
-                transaction.location = location if location != 'None' else None
+# Extract location, ensuring the correct delimiter
+location_match = re.search(r'- ([^/]+?)( //| dev:)', rest)
+if location_match:
+    location = location_match.group(1).strip()
+    transaction.location = location if location != 'None' else None
             
             # Extract device
             device_match = re.search(r'dev:([^$]+)$', rest)
@@ -488,8 +488,9 @@ class TransactionLogParser:
         logger.info(f"Starting to parse dataset: {file_path}")
         
         # Read the CSV file
-        df_raw = pd.read_csv(file_path, delimiter='|', header=None, names=['line_num', 'raw_log'])
-        
+        # df_raw = pd.read_csv(file_path, delimiter='|', header=None, names=['line_num', 'raw_log'])
+        df_raw = pd.read_csv(file_path)
+        print(len(df_raw))
         transactions = []
         parsing_stats = {
             'total_logs': len(df_raw),
@@ -528,7 +529,6 @@ class TransactionLogParser:
             
             # Convert to dictionary for DataFrame
             transaction_dict = {
-                'line_num': row['line_num'],
                 'raw_log': transaction.raw_log,
                 'timestamp': transaction.timestamp,
                 'user_id': transaction.user_id,
