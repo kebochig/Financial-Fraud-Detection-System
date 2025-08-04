@@ -65,6 +65,7 @@ def test_fraud_detection_system():
             })
         
         df_test = pd.DataFrame(parsed_transactions)
+        print(df_test[df_test['is_parsed']==True].head(5))
         parsed_count = df_test['is_parsed'].sum()
         print(f"✅ Parser test: {parsed_count}/{len(test_logs)} logs parsed successfully")
         
@@ -96,52 +97,33 @@ def test_fraud_detection_system():
         print("\n📋 Parsing Summary Table:")
         print(summary_table.to_string(index=False))
         
-        # Create a larger synthetic dataset for testing
-        print("\n🏗️ Creating synthetic test dataset...")
-        np.random.seed(42)
+        # Use parsed data from test logs for feature extraction and modeling
+        print("\n🏗️ Preparing parsed test data for modeling...")
         
-        synthetic_data = []
-        users = [f"user{i}" for i in range(1000, 1100)]
-        locations = ['London', 'Glasgow', 'Birmingham', 'Liverpool', 'Cardiff']
-        devices = ['iPhone 13', 'Samsung Galaxy S10', 'Pixel 6', 'Nokia 3310']
-        transaction_types = ['withdrawal', 'deposit', 'purchase', 'transfer']
+        # Filter only successfully parsed transactions
+        df_parsed = df_test[df_test['is_parsed'] == True].copy().reset_index(drop=True)
         
-        for i in range(500):  # Create 500 synthetic transactions
-            user = np.random.choice(users)
-            location = np.random.choice(locations)
-            device = np.random.choice(devices)
-            tx_type = np.random.choice(transaction_types)
-            amount = np.random.lognormal(5, 1)  # Log-normal distribution for amounts
-            
-            # Create timestamp
-            base_time = datetime(2025, 6, 1)
-            days_offset = np.random.randint(0, 60)
-            hours_offset = np.random.randint(0, 24)
-            timestamp = base_time + timedelta(days=days_offset, hours=hours_offset)
-            
-            synthetic_data.append({
-                'line_num': i + 1,
-                'raw_log': f"synthetic_log_{i}",
-                'timestamp': timestamp,
-                'user_id': user,
-                'transaction_type': tx_type,
-                'amount': amount,
-                'currency': '£',
-                'location': location,
-                'device': device,
-                'is_parsed': True,
-                'parse_errors': None
-            })
+        # Add line numbers for tracking
+        df_parsed['line_num'] = range(1, len(df_parsed) + 1)
         
-        df_synthetic = pd.DataFrame(synthetic_data)
-        print(f"✅ Created synthetic dataset with {len(df_synthetic)} transactions")
+        # Fill missing currency with default
+        if 'currency' not in df_parsed.columns:
+            df_parsed['currency'] = '£'  # Default currency
+        
+        # Handle missing parse_errors column
+        if 'parse_errors' not in df_parsed.columns:
+            df_parsed['parse_errors'] = None
+        
+        print(f"✅ Using parsed test data with {len(df_parsed)} successfully parsed transactions")
+        print("Sample parsed transactions:")
+        print(df_parsed.head(5))
         
         # Test feature extraction
         print("\n🔧 Testing feature extraction...")
         feature_extractor = TransactionFeatureExtractor()
-        df_features = feature_extractor.extract_all_features(df_synthetic)
+        df_features = feature_extractor.extract_all_features(df_parsed)
         
-        original_features = len(df_synthetic.columns)
+        original_features = len(df_parsed.columns)
         new_features = len(df_features.columns)
         added_features = new_features - original_features
         
