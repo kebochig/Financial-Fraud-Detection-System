@@ -247,6 +247,11 @@ class StatisticalAnomalyDetector:
         
         # Clustering-based detection
         predictions.update(self._cluster_based_detection(X_scaled))
+
+        
+        
+        # Print top 5 scores and users for each method
+        # self._print_top_scores(df, predictions)
         
         logger.info(f"Statistical anomaly detection complete. Generated {len(predictions)} score sets.")
         return predictions
@@ -327,6 +332,125 @@ class StatisticalAnomalyDetector:
         
         normalized = (scores - min_score) / (max_score - min_score)
         return np.clip(normalized, 0, 1)
+    
+    def _print_top_scores(self, df: pd.DataFrame, predictions: Dict[str, np.ndarray]):
+        """Print top 5 scores and their users for each statistical method."""
+        if 'user_id' not in df.columns:
+            logger.warning("No user_id column found. Cannot print user-specific scores.")
+            return
+        
+        print("\n" + "="*80)
+        print("🏆 TOP 5 ANOMALY SCORES BY USER FOR EACH STATISTICAL METHOD")
+        print("="*80)
+        
+        for method_name, scores in predictions.items():
+            print(f"\n📊 {method_name.upper().replace('_', ' ')}")
+            print("-" * 60)
+            
+            # Create DataFrame with user_id and scores
+            score_df = pd.DataFrame({
+                'user_id': df['user_id'],
+                'score': scores,
+                'amount': df.get('amount', [0] * len(df)),
+                'location': df.get('location', ['Unknown'] * len(df)),
+                'transaction_type': df.get('transaction_type', ['Unknown'] * len(df))
+            })
+            
+            # Group by user and get mean score
+            user_scores = score_df.groupby('user_id').agg({
+                'score': ['mean', 'max', 'count'],
+                'amount': 'mean',
+                'location': lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else 'Unknown',
+                'transaction_type': lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else 'Unknown'
+            }).round(4)
+            
+            # Flatten column names
+            user_scores.columns = ['mean_score', 'max_score', 'tx_count', 'avg_amount', 'main_location', 'main_type']
+            
+            # Sort by mean score (descending)
+            user_scores = user_scores.sort_values('mean_score', ascending=False)
+            
+            # Get top 5 users
+            top_5_users = user_scores.head(5)
+            
+            # Print header
+            print(f"{'Rank':<4} {'User':<12} {'Mean Score':<12} {'Max Score':<12} {'Tx Count':<10} {'Avg Amount':<12} {'Location':<12} {'Type':<12}")
+            print("-" * 100)
+            
+            for rank, (user_id, row) in enumerate(top_5_users.iterrows(), 1):
+                mean_score = row['mean_score']
+                max_score = row['max_score']
+                tx_count = int(row['tx_count'])
+                avg_amount = row['avg_amount']
+                location = row['main_location']
+                tx_type = row['main_type']
+                
+                # Determine risk level
+                if mean_score > 0.8:
+                    risk_level = "🔥 CRITICAL"
+                elif mean_score > 0.6:
+                    risk_level = "⚠️ HIGH"
+                elif mean_score > 0.4:
+                    risk_level = "⚡ MEDIUM"
+                elif mean_score > 0.2:
+                    risk_level = "📊 LOW"
+                else:
+                    risk_level = "✅ NORMAL"
+                
+                print(f"{rank:<4} {user_id:<12} {mean_score:<12.4f} {max_score:<12.4f} {tx_count:<10} "
+                      f"{avg_amount:<12.1f} {location:<12} {tx_type:<12} {risk_level}")
+            
+            # Print summary statistics
+            print(f"\n📈 {method_name} Summary:")
+            print(f"   • Total users analyzed: {len(user_scores)}")
+            print(f"   • Users with high risk (score > 0.6): {len(user_scores[user_scores['mean_score'] > 0.6])}")
+            print(f"   • Users with critical risk (score > 0.8): {len(user_scores[user_scores['mean_score'] > 0.8])}")
+            print(f"   • Average score across all users: {user_scores['mean_score'].mean():.4f}")
+            print(f"   • Highest individual score: {user_scores['max_score'].max():.4f}")
+        
+        # Print ensemble comparison
+        print(f"\n🎯 ENSEMBLE COMPARISON")
+        print("-" * 60)
+        
+        # Calculate ensemble scores if multiple methods available
+        if len(predictions) > 1:
+            ensemble_scores = np.zeros(len(df))
+            for scores in predictions.values():
+                ensemble_scores += scores
+            ensemble_scores /= len(predictions)
+            
+            # Create ensemble DataFrame
+            ensemble_df = pd.DataFrame({
+                'user_id': df['user_id'],
+                'ensemble_score': ensemble_scores
+            })
+            
+            # Group by user
+            ensemble_user_scores = ensemble_df.groupby('user_id')['ensemble_score'].agg(['mean', 'max', 'count']).round(4)
+            ensemble_user_scores = ensemble_user_scores.sort_values('mean', ascending=False)
+            
+            print(f"{'Rank':<4} {'User':<12} {'Ensemble Score':<15} {'Max Score':<12} {'Tx Count':<10}")
+            print("-" * 65)
+            
+            for rank, (user_id, row) in enumerate(ensemble_user_scores.head(5).iterrows(), 1):
+                mean_score = row['mean']
+                max_score = row['max']
+                tx_count = int(row['count'])
+                
+                if mean_score > 0.8:
+                    risk_level = "🔥 CRITICAL"
+                elif mean_score > 0.6:
+                    risk_level = "⚠️ HIGH"
+                elif mean_score > 0.4:
+                    risk_level = "⚡ MEDIUM"
+                elif mean_score > 0.2:
+                    risk_level = "📊 LOW"
+                else:
+                    risk_level = "✅ NORMAL"
+                
+                print(f"{rank:<4} {user_id:<12} {mean_score:<15.4f} {max_score:<12.4f} {tx_count:<10} {risk_level}")
+        
+        print("\n" + "="*80)
     
     def get_feature_importance(self, df: pd.DataFrame, method: str = 'isolation_forest') -> Dict[str, float]:
         """Get feature importance for anomaly detection."""

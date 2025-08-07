@@ -1,0 +1,83 @@
+
+====================================================================================================
+🚨 ENSEMBLE FRAUD DETECTION SYSTEM - COMPREHENSIVE REPORT
+====================================================================================================
+
+📊 OVERALL STATISTICS
+--------------------------------------------------
+📈 Total Transactions Analyzed: 7,774
+🎯 Mean Ensemble Score: 0.3644
+📏 Score Standard Deviation: 0.0593
+🔝 Highest Score: 0.7115
+🔻 Lowest Score: 0.2457
+
+⚠️ RISK LEVEL BREAKDOWN
+--------------------------------------------------
+🔥 CRITICAL RISK (>0.8): 0 transactions (0.0%)
+⚠️ HIGH RISK (0.7-0.8): 1 transactions (0.0%)
+⚡ MEDIUM RISK (0.5-0.7): 182 transactions (2.3%)
+📊 LOW RISK (0.3-0.5): 6,629 transactions (85.3%)
+✅ NORMAL (<0.3): 962 transactions (12.4%)
+
+👥 USERS BY RISK CATEGORY
+--------------------------------------------------
+
+⚠️ HIGH RISK USERS (1 unique users):
+   • user1026: Score 0.4533 (Max: 0.7115), 32 tx, £66659 total, Glasgow
+
+⚡ MEDIUM RISK USERS (71 unique users):
+   • user1015: Score 0.5854 (Max: 0.6374), 4 tx, £8035 total, Cardiff
+   • user1089: Score 0.5823 (Max: 0.5823), 1 tx, £4763 total, Glasgow
+   • user1080: Score 0.5806 (Max: 0.5806), 1 tx, £4759 total, Liverpool
+   • user1021: Score 0.5759 (Max: 0.6419), 5 tx, £18230 total, Glasgow
+   • user1020: Score 0.5738 (Max: 0.6829), 6 tx, £14533 total, Liverpool
+   ... and 66 more users
+
+🔍 COMPONENT ANALYSIS
+--------------------------------------------------
+📋 Rule-Based Detection:
+   • Mean Score: 0.1821
+   • Weight: 0.30
+   • High Risk (>0.7): 0 transactions
+
+👤 TOP ANOMALOUS USERS
+--------------------------------------------------
+Rank User         Ensemble   Rule     Tx Count   Avg Amount   Total        Location     Type        
+----------------------------------------------------------------------------------------------------
+1    user1001     0.4622     0.1845   35         1994.3       69799.0      Cardiff      transfer     📊 LOW
+2    user1088     0.4593     0.1793   29         1930.8       55993.7      Cardiff      transfer     📊 LOW
+3    user1006     0.4592     0.1706   34         1813.1       61646.9      Leeds        transfer     📊 LOW
+4    user1026     0.4533     0.1830   32         2083.1       66658.9      Glasgow      withdrawal   📊 LOW
+5    user1072     0.4447     0.1670   32         2064.3       66056.7      Leeds        debit        📊 LOW
+6    user1041     0.4441     0.1742   31         2540.6       78758.4      London       refund       📊 LOW
+7    user1065     0.4434     0.1908   34         2295.7       78055.2      Cardiff      cashout      📊 LOW
+8    user1086     0.4433     0.1802   36         2238.8       80598.4      Glasgow      refund       📊 LOW
+9    user1050     0.4335     0.1683   37         2374.6       87861.6      Glasgow      debit        📊 LOW
+10   user1090     0.4329     0.1768   37         2307.2       85366.5      Glasgow      deposit      📊 LOW
+
+🎯 ACTIONABLE INSIGHTS & RECOMMENDATIONS
+--------------------------------------------------
+
+⚠️ HIGH PRIORITY REVIEW:
+   • 1 transactions flagged as HIGH risk
+   • Recommend: MANUAL REVIEW required
+   • Consider additional verification for these users
+
+🔍 SUSPICIOUS PATTERNS DETECTED:
+   • 1 users have multiple high-risk transactions
+   • Top suspicious user: user1026 (1 high-risk tx)
+
+⚙️ SYSTEM PERFORMANCE:
+   • Ensemble model successfully processed 7,774 transactions
+   • Detection rate: 0.0% of transactions flagged
+   • Model confidence: MEDIUM
+
+📋 RECOMMENDED NEXT STEPS:
+   2. 👀 MANUAL REVIEW of high-risk transactions
+   3. 👤 INVESTIGATE top 5 suspicious users
+   4. 📊 MONITOR system performance and adjust thresholds if needed
+   5. 🔄 RETRAIN models with new data if detection rate is too high/low
+
+📄 Report generated on: 2025-08-07 02:20:01
+📊 Total transactions processed: 7,774
+🎯 Ensemble model version: EnsembleAnomalyDetector

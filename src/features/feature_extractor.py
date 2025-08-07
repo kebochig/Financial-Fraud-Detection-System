@@ -34,6 +34,7 @@ class TransactionFeatureExtractor:
         
         # Temporal features
         if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
             df_features['hour'] = df['timestamp'].dt.hour
             df_features['day_of_week'] = df['timestamp'].dt.dayofweek
             df_features['is_weekend'] = df_features['day_of_week'].isin([5, 6])
@@ -121,9 +122,18 @@ class TransactionFeatureExtractor:
         # Calculate different statistics separately to avoid column conflicts
         
         # Amount statistics
-        amount_stats = df.groupby('user_id')['amount'].agg([
-            'count', 'mean', 'std', 'min', 'max', 'sum'
-        ]).round(4)
+        if 'amount' in df.columns:
+            amount_stats = df.groupby('user_id')['amount'].agg([
+                'count', 'mean', 'std', 'min', 'max', 'sum'
+            ]).round(4)
+        else:
+            # If no amount column, create dummy stats
+            amount_stats = df.groupby('user_id').size().to_frame('count')
+            amount_stats['mean'] = 0
+            amount_stats['std'] = 0
+            amount_stats['min'] = 0
+            amount_stats['max'] = 0
+            amount_stats['sum'] = 0
         
         # Rename amount stat columns
         amount_stats.columns = [
@@ -132,14 +142,26 @@ class TransactionFeatureExtractor:
         ]
         
         # Timestamp statistics
-        timestamp_stats = df.groupby('user_id')['timestamp'].agg(['min', 'max'])
-        timestamp_stats.columns = ['user_first_tx_time', 'user_last_tx_time']
+        if 'timestamp' in df.columns:
+            timestamp_stats = df.groupby('user_id')['timestamp'].agg(['min', 'max'])
+            timestamp_stats.columns = ['user_first_tx_time', 'user_last_tx_time']
+            # print(timestamp_stats.head(10))
+            
+            # Convert timestamp columns to datetime
+            timestamp_stats['user_first_tx_time'] = pd.to_datetime(timestamp_stats['user_first_tx_time'], errors='coerce')
+            timestamp_stats['user_last_tx_time'] = pd.to_datetime(timestamp_stats['user_last_tx_time'], errors='coerce')
+        else:
+            # If no timestamp column, create dummy stats
+            timestamp_stats = df.groupby('user_id').size().to_frame('count')
+            timestamp_stats['user_first_tx_time'] = pd.Timestamp.now()
+            timestamp_stats['user_last_tx_time'] = pd.Timestamp.now()
+            timestamp_stats = timestamp_stats.drop('count', axis=1)
         
         # Nunique statistics with proper names
-        location_nunique = df.groupby('user_id')['location'].nunique().rename('user_unique_locations')
-        device_nunique = df.groupby('user_id')['device'].nunique().rename('user_unique_devices')
-        type_nunique = df.groupby('user_id')['transaction_type'].nunique().rename('user_unique_types')
-        currency_nunique = df.groupby('user_id')['currency'].nunique().rename('user_unique_currencies')
+        location_nunique = df.groupby('user_id')['location'].nunique().rename('user_unique_locations') if 'location' in df.columns else pd.Series(0, index=df.groupby('user_id').size().index, name='user_unique_locations')
+        device_nunique = df.groupby('user_id')['device'].nunique().rename('user_unique_devices') if 'device' in df.columns else pd.Series(0, index=df.groupby('user_id').size().index, name='user_unique_devices')
+        type_nunique = df.groupby('user_id')['transaction_type'].nunique().rename('user_unique_types') if 'transaction_type' in df.columns else pd.Series(0, index=df.groupby('user_id').size().index, name='user_unique_types')
+        currency_nunique = df.groupby('user_id')['currency'].nunique().rename('user_unique_currencies') if 'currency' in df.columns else pd.Series(0, index=df.groupby('user_id').size().index, name='user_unique_currencies')
         
         # Combine all statistics
         user_stats = amount_stats.join([
@@ -151,9 +173,13 @@ class TransactionFeatureExtractor:
         ])
         
         # User activity timespan
-        user_stats['user_activity_days'] = (
-            user_stats['user_last_tx_time'] - user_stats['user_first_tx_time']
-        ).dt.total_seconds() / (24 * 3600)
+        try:
+            user_stats['user_activity_days'] = (
+                user_stats['user_last_tx_time'] - user_stats['user_first_tx_time']
+            ).dt.total_seconds() / (24 * 3600)
+        except Exception as e:
+            logger.warning(f"Error calculating activity days: {e}")
+            user_stats['user_activity_days'] = 1  # Default to 1 day
         
         # Average transactions per day
         user_stats['user_tx_per_day'] = (
@@ -190,7 +216,14 @@ class TransactionFeatureExtractor:
             logger.warning("Missing timestamp or user_id. Skipping temporal features.")
             return df
         
-        df_features = df.copy().sort_values(['user_id', 'timestamp'])
+        df_features = df.copy()
+        
+        # Ensure timestamp is datetime
+        if not pd.api.types.is_datetime64_any_dtype(df_features['timestamp']):
+            df_features['timestamp'] = pd.to_datetime(df_features['timestamp'], errors='coerce')
+        
+        # Sort by user_id and timestamp
+        df_features = df_features.sort_values(['user_id', 'timestamp'])
         
         # Time since last transaction (per user)
         df_features['time_since_last_tx'] = (
@@ -208,47 +241,71 @@ class TransactionFeatureExtractor:
         # Transaction velocity (transactions in last N hours)
         window_hours = self.temporal_window_hours
         
-        def count_recent_transactions(group):
-            timestamps = group['timestamp']
-            counts = []
-            for ts in timestamps:
-                window_start = ts - timedelta(hours=window_hours)
-                recent_count = ((timestamps >= window_start) & (timestamps < ts)).sum()
-                counts.append(recent_count)
-            return pd.Series(counts, index=group.index)
+        try:
+            def count_recent_transactions(group):
+                timestamps = group['timestamp']
+                counts = []
+                for ts in timestamps:
+                    window_start = ts - timedelta(hours=window_hours)
+                    recent_count = ((timestamps >= window_start) & (timestamps < ts)).sum()
+                    counts.append(recent_count)
+                return pd.Series(counts, index=group.index)
+            
+            df_features['tx_velocity_24h'] = (
+                df_features.groupby('user_id')
+                .apply(count_recent_transactions)
+                .reset_index(level=0, drop=True)
+            )
+        except Exception as e:
+            logger.warning(f"Error calculating transaction velocity: {e}")
+            df_features['tx_velocity_24h'] = 0
         
-        df_features['tx_velocity_24h'] = (
-            df_features.groupby('user_id')
-            .apply(count_recent_transactions)
-            .reset_index(level=0, drop=True)
-        )
+        # Location changes (only if location column exists)
+        if 'location' in df_features.columns:
+            df_features['location_changed'] = (
+                df_features.groupby('user_id')['location']
+                .shift(1) != df_features['location']
+            ).astype(int)
+        else:
+            df_features['location_changed'] = 0
         
-        # Location changes
-        df_features['location_changed'] = (
-            df_features.groupby('user_id')['location']
-            .shift(1) != df_features['location']
-        ).astype(int)
+        # Device changes (only if device column exists)
+        if 'device' in df_features.columns:
+            df_features['device_changed'] = (
+                df_features.groupby('user_id')['device']
+                .shift(1) != df_features['device']
+            ).astype(int)
+        else:
+            df_features['device_changed'] = 0
         
-        # Device changes
-        df_features['device_changed'] = (
-            df_features.groupby('user_id')['device']
-            .shift(1) != df_features['device']
-        ).astype(int)
+        # Amount deviation from user's pattern (only if amount column exists)
+        if 'amount' in df_features.columns:
+            df_features['amount_zscore_user'] = (
+                df_features.groupby('user_id')['amount']
+                .transform(lambda x: (x - x.mean()) / np.maximum(x.std(), 1e-8))
+            ).round(4)
+        else:
+            df_features['amount_zscore_user'] = 0
         
-        # Amount deviation from user's pattern
-        df_features['amount_zscore_user'] = (
-            df_features.groupby('user_id')['amount']
-            .transform(lambda x: (x - x.mean()) / np.maximum(x.std(), 1e-8))
-        ).round(4)
-        
-        # Time patterns
-        df_features['is_unusual_hour'] = (
-            (df_features['hour'] < 6) | (df_features['hour'] > 22)
-        ).astype(int)
-        
-        df_features['is_night_transaction'] = (
-            (df_features['hour'] >= 0) & (df_features['hour'] < 6)
-        ).astype(int)
+        # Time patterns (only if hour column exists)
+        if 'hour' in df_features.columns:
+            df_features['is_unusual_hour'] = (
+                (df_features['hour'] < 6) | (df_features['hour'] > 22)
+            ).astype(int)
+            
+            df_features['is_night_transaction'] = (
+                (df_features['hour'] >= 0) & (df_features['hour'] < 6)
+            ).astype(int)
+        else:
+            # Create hour column if it doesn't exist
+            df_features['hour'] = df_features['timestamp'].dt.hour
+            df_features['is_unusual_hour'] = (
+                (df_features['hour'] < 6) | (df_features['hour'] > 22)
+            ).astype(int)
+            
+            df_features['is_night_transaction'] = (
+                (df_features['hour'] >= 0) & (df_features['hour'] < 6)
+            ).astype(int)
         
         logger.info("Temporal features extracted.")
         return df_features

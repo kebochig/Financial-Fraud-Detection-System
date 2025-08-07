@@ -22,6 +22,8 @@ class ParsedTransaction:
     transaction_type: Optional[str] = None
     amount: Optional[float] = None
     currency: Optional[str] = None
+    amount_gbp: Optional[float] = None  # Amount converted to GBP
+    original_currency: Optional[str] = None  # Original currency before conversion
     location: Optional[str] = None
     device: Optional[str] = None
     raw_log: str = ""
@@ -41,6 +43,16 @@ class TransactionLogParser:
             '%Y-%m-%d %H:%M:%S',
             '%d/%m/%Y %H:%M:%S'
         ])
+        
+        # Exchange rates to convert to GBP (£)
+        self.exchange_rates = {
+            '$': 0.75,  # 1 USD = 0.75 GBP
+            '€': 0.87,  # 1 EUR = 0.87 GBP
+            '£': 1.0,   # 1 GBP = 1.0 GBP
+            'unknown': 1.0,  # Default to GBP if unknown
+            None: 1.0,  # Default to GBP if None
+            '': 1.0     # Default to GBP if empty
+        }
         
         # Regex patterns for extracting information
         self.patterns = {
@@ -218,11 +230,11 @@ class TransactionLogParser:
                     transaction.currency = amount_match.group(1) or None
                     transaction.amount = float(amount_match.group(2))
             
-# Extract location, ensuring the correct delimiter
-location_match = re.search(r'- ([^/]+?)( //| dev:)', rest)
-if location_match:
-    location = location_match.group(1).strip()
-    transaction.location = location if location != 'None' else None
+            # Extract location, ensuring the correct delimiter
+            location_match = re.search(r'- ([^/]+?)( //| dev:)', rest)
+            if location_match:
+                location = location_match.group(1).strip()
+                transaction.location = location if location != 'None' else None
             
             # Extract device
             device_match = re.search(r'dev:([^$]+)$', rest)
@@ -482,6 +494,26 @@ if location_match:
         # Set currency if amount exists but currency doesn't
         if transaction.amount is not None and not transaction.currency:
             transaction.currency = 'unknown'
+        
+        # Convert currency to GBP and standardize amount
+        if transaction.amount is not None and transaction.currency:
+            transaction.amount_gbp = self._convert_to_gbp(transaction.amount, transaction.currency)
+            transaction.original_currency = transaction.currency
+            transaction.currency = 'GBP'  # Standardize to GBP
+    
+    def _convert_to_gbp(self, amount: float, currency: str) -> float:
+        """Convert amount from given currency to GBP using exchange rates."""
+        if amount is None:
+            return None
+        
+        # Get exchange rate for the currency
+        exchange_rate = self.exchange_rates.get(currency, 1.0)
+        
+        # Convert to GBP
+        amount_gbp = amount * exchange_rate
+        
+        # Round to 2 decimal places for currency precision
+        return round(amount_gbp, 2)
     
     def parse_dataset(self, file_path: str) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """Parse entire dataset and return DataFrame with statistics."""
@@ -545,6 +577,131 @@ if location_match:
         
         # Create DataFrame
         df_parsed = pd.DataFrame(transactions)
+
+        df_parsed['location'] = df_parsed['location'].apply(lambda x: x.split('-')[-1].strip() if isinstance(x, str) and '-' in x else x)
+
+        # Currency mapping based on location for None/missing currencies
+        location_currency_map = {
+            'Leeds': '£',
+            'London': '£', 
+            'Glasgow': '£',
+            'Manchester': '£',
+            'Birmingham': '£',
+            'Cardiff': '£',
+            'Liverpool': '£'
+        }
+        
+        # Fill missing currencies based on location mapping
+        mask = (df_parsed['currency'].isnull()) | (df_parsed['currency'] == 'None') | (df_parsed['currency'] == '')
+        for idx in df_parsed[mask].index:
+            location = df_parsed.loc[idx, 'location']
+            if location in location_currency_map:
+                df_parsed.loc[idx, 'currency'] = location_currency_map[location]
+            elif location is not None:  # Unknown location, default to £
+                df_parsed.loc[idx, 'currency'] = '£'
+        
+        # Convert amount to GBP if currency is known
+        df_parsed['amount_raw'] = df_parsed['amount']  # Keep original amount for reference
+        df_parsed['amount'] = df_parsed.apply(lambda row: self._convert_to_gbp(row['amount'], row['currency']) if pd.notna(row['amount']) else None, axis=1)
+
+        
+        # Add parsing success statistics
+        parsing_stats['parsing_success'] = {
+            'success': parsing_stats['parsed_successfully'],
+            'failed': parsing_stats['parsing_failed'] + parsing_stats['empty_logs'] + parsing_stats['malformed_logs']
+        }
+        
+        logger.info(f"Parsing complete. Successfully parsed: {parsing_stats['parsed_successfully']}, "
+                   f"Failed: {parsing_stats['parsing_failed']}, "
+                   f"Empty/Malformed: {parsing_stats['empty_logs'] + parsing_stats['malformed_logs']}")
+        
+        return df_parsed, parsing_stats
+    
+    def parse_dataset_from_dataframe(self, df_raw: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+        """Parse dataset from a DataFrame and return DataFrame with statistics."""
+        logger.info(f"Starting to parse dataset from DataFrame with {len(df_raw)} rows")
+        
+        transactions = []
+        parsing_stats = {
+            'total_logs': len(df_raw),
+            'parsed_successfully': 0,
+            'parsing_failed': 0,
+            'empty_logs': 0,
+            'malformed_logs': 0,
+            'parsing_errors': []
+        }
+        
+        logger.info(f"Processing {len(df_raw)} log entries...")
+        
+        for idx, row in df_raw.iterrows():
+            if pd.isna(row['raw_log']):
+                parsing_stats['empty_logs'] += 1
+                continue
+                
+            raw_log = str(row['raw_log']).strip()
+            
+            if raw_log == 'MALFORMED_LOG':
+                parsing_stats['malformed_logs'] += 1
+                continue
+            
+            if raw_log == '""' or raw_log == '':
+                parsing_stats['empty_logs'] += 1
+                continue
+            
+            # Parse the log entry
+            transaction = self.parse_log_entry(raw_log)
+            
+            if transaction.is_parsed:
+                parsing_stats['parsed_successfully'] += 1
+            else:
+                parsing_stats['parsing_failed'] += 1
+                parsing_stats['parsing_errors'].extend(transaction.parse_errors)
+            
+            # Convert to dictionary for DataFrame
+            transaction_dict = {
+                'raw_log': transaction.raw_log,
+                'timestamp': transaction.timestamp,
+                'user_id': transaction.user_id,
+                'transaction_type': transaction.transaction_type,
+                'amount': transaction.amount,
+                'currency': transaction.currency,
+                'location': transaction.location,
+                'device': transaction.device,
+                'is_parsed': transaction.is_parsed,
+                'parse_errors': '; '.join(transaction.parse_errors) if transaction.parse_errors else None
+            }
+            
+            transactions.append(transaction_dict)
+        
+        # Create DataFrame
+        df_parsed = pd.DataFrame(transactions)
+
+        df_parsed['location'] = df_parsed['location'].apply(lambda x: x.split('-')[-1].strip() if isinstance(x, str) and '-' in x else x)
+
+        # Currency mapping based on location for None/missing currencies
+        location_currency_map = {
+            'Leeds': '£',
+            'London': '£', 
+            'Glasgow': '£',
+            'Manchester': '£',
+            'Birmingham': '£',
+            'Cardiff': '£',
+            'Liverpool': '£'
+        }
+        
+        # Fill missing currencies based on location mapping
+        mask = (df_parsed['currency'].isnull()) | (df_parsed['currency'] == 'None') | (df_parsed['currency'] == '')
+        for idx in df_parsed[mask].index:
+            location = df_parsed.loc[idx, 'location']
+            if location in location_currency_map:
+                df_parsed.loc[idx, 'currency'] = location_currency_map[location]
+            elif location is not None:  # Unknown location, default to £
+                df_parsed.loc[idx, 'currency'] = '£'
+        
+        # Convert amount to GBP if currency is known
+        df_parsed['amount_raw'] = df_parsed['amount']  # Keep original amount for reference
+        df_parsed['amount'] = df_parsed.apply(lambda row: self._convert_to_gbp(row['amount'], row['currency']) if pd.notna(row['amount']) else None, axis=1)
+
         
         # Add parsing success statistics
         parsing_stats['parsing_success'] = {

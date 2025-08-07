@@ -36,18 +36,9 @@ def test_fraud_detection_system():
         print("\n🔧 Testing log parser...")
         parser = TransactionLogParser()
         
-        # Test on a few sample entries
-        # test_logs = [
-        #     "2025-07-05 19:18:10::user1069::withdrawal::2995.12::London::iPhone 13",
-        #     "usr:user1076|cashout|€4821.85|Glasgow|2025-07-15 12:56:05|Pixel 6",
-        #     "2025-07-20 05:38:14 >> [user1034] did top-up - amt=€2191.06 - None // dev:iPhone 13",
-        #     "MALFORMED_LOG",
-        #     '""'
-        # ]
         # Load test logs from CSV file
         test_logs_df = pd.read_csv('test_logs.csv')
         # Filter NaN values with empty strings and convert to string
-        # test_logs = test_logs_df['raw_log'].dropna().astype(str).tolist()
         test_logs = test_logs_df['raw_log'].fillna("").astype(str).tolist()
         
         parsed_transactions = []
