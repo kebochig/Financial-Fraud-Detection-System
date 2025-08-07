@@ -125,10 +125,23 @@ jupyter notebook notebooks/3_anomaly_detection.ipynb
 ```bash
 streamlit run app/streamlit_app.py
 ```
+- Open Browser and load `http://localhost:8501`
 - Interactive fraud detection interface
 - Upload transaction logs
 - Real-time anomaly detection
 - Multiple Visualization dashboards (Side-bar)
+
+#### Navigation
+
+Use the sidebar to navigate between different sections:
+
+- **Dashboard**: Overview of key metrics and quick insights
+- **Data Exploration**: Detailed data analysis and statistics
+- **Log Parsing Analysis**: Parsing performance and quality metrics
+- **Data Quality Report**: Comprehensive data quality assessment
+- **User Behavior Analysis**: User patterns and behavior insights
+- **Transaction Analysis**: Transaction patterns and amount analysis
+- **Fraud Detection**: Live fraud detection capabilities
 
 
 ## 🔍 Model Details
